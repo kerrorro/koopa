@@ -4,16 +4,15 @@ import Pins from "pins";
 /*******    TEXTURES  *********/
 /*******************************/
 let lampTexture = new Texture("assets/lamp_buttons.png");
-let weighTexture = new Texture("");
-let feedTexture = new Texture("");
+let weighTexture = new Texture("assets/weigh_buttons.png");
+let feedTexture = new Texture("assets/feed_buttons.png");
 
 var titleFont = new Style({ font: "36px ABeeZee", color: "white" })
 var abzFont = new Style({ font: "24px ABeeZee", color: "white" })
 /*******************************/
 /*********    SKINS  ***********/
 /*******************************/
-let headerSkin = new Skin({fill: "green"})
-let tierSkin = new Skin({fill: "white"})
+let headerSkin = new Skin({fill: "#5BAC55"})
 
 /******** button skins *******/
 // Grid of skin states (on/off) and variants (up/down)
@@ -24,20 +23,21 @@ let lampSkin = new Skin({
 })
 let weighSkin = new Skin({
 	height: 110, width: 110, // dimensions of grid cell
-	texture: feedTexture,
-	states: 110, variants: 110 // state and variant offsets
+	texture: weighTexture,
+	variants: 110 			// weigh button has no on/off (state)
 })
 let feedSkin = new Skin({
 	height: 110, width: 110, // dimensions of grid cell
 	texture: feedTexture,
-	states: 110, variants: 110 // state and variant offsets
+	variants: 110 			// feed button has no on/off (state)
 })
 
 
 
 let header = new Container({
 	left: 0, right: 0, top: 0, height: 60,
-	skin: headerSkin
+	skin: headerSkin,
+	contents: [new Label({ style: titleFont, string: "koopa" })]
 })
 
 var buttonBehavior = Behavior({
@@ -62,13 +62,13 @@ var CircleButton = Content.template ( $ => ({
 // NestedTier({ skin, content })
 var NestedTier = Container.template( $ => ({
 	left: 0, right: 0, top: 0, height: 140, 
-	skin: tierSkin,
+	name: $.name, skin: $.boxSkin,
 	contents: [],
 	behavior: Behavior({
 		onCreate(container){
 			if ($.content == "button"){
 				trace("content is a button\n");
-				container.add(new CircleButton({ skin: lampSkin }));
+				container.add(new CircleButton({ skin: $.buttonSkin }));
 			}
 			if ($.content == "string"){
 				container.skin = $.skin;
@@ -82,9 +82,9 @@ var NestedTier = Container.template( $ => ({
 let mainScreen = new Column({
 	left: 0, right: 0, top: 0, bottom: 0,
 	contents: [
-		new NestedTier({ skin: new Skin({fill: "gray"}), content: "button" }),
-		new NestedTier({ skin: new Skin({fill: "orange"}), content: "button" }),
-		new NestedTier({ skin: new Skin({fill: "red"}), content: "button" }),
+		new NestedTier({ name: "lamp", boxSkin: new Skin({ fill: "#E8F9E0" }), buttonSkin: lampSkin, content: "button" }),
+		new NestedTier({ name: "weigh", boxSkin: new Skin({ fill: "#CFF1BF" }), buttonSkin: weighSkin, content: "button" }),
+		new NestedTier({ name: "feed", boxSkin: new Skin({ fill: "#B8F99A" }), buttonSkin: feedSkin, content: "button" }),
 		
 	]
 })
