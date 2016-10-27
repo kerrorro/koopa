@@ -1,26 +1,77 @@
 import Pins from "pins";
 
-let headerSkin = new Skin({fill: "green"})
+/*******************************/
+/*******    TEXTURES  *********/
+/*******************************/
 
+let lampTexture = new Texture("assets/lamp_buttons.png");
+let weighTexture = new Texture("");
+let feedTexture = new Texture("");
+
+/*******************************/
+/*********    SKINS  ***********/
+/*******************************/
+let headerSkin = new Skin({fill: "green"})
+let tierSkin = new Skin({fill: "white"})
+
+/******** button skins *******/
+// Grid of skin states (on/off) and variants (up/down)
+let lampSkin = new Skin({
+	height: 100, width: 100, // dimensions of grid cell
+	texture: lampTexture,
+	states: 100, variants: 100 // state and variant offsets
+})
+let weighSkin = new Skin({
+	height: 100, width: 100, // dimensions of grid cell
+	texture: feedTexture,
+	states: 100, variants: 100 // state and variant offsets
+})
+let feedSkin = new Skin({
+	height: 100, width: 100, // dimensions of grid cell
+	texture: feedTexture,
+	states: 100, variants: 100 // state and variant offsets
+})
 
 
 
 let header = new Container({
-	left: 0, right: 0, top: 0, height: 40,
+	left: 0, right: 0, top: 0, height: 60,
 	skin: headerSkin
 })
 
-let nestedTier = Container.template( $ => ({
-	left: 0, right: 0, top: 0, bottom: 0, 
+// CircleButton({ skin }) - skin should be a button skin with states/variants
+var CircleButton = Content.template ( $ => ({
+	height: 100, width: 100,
+	skin: $.skin, 
+	state: 0, variant: 0
+}))
 
+// NestedTier({ skin, content })
+var NestedTier = Container.template( $ => ({
+	left: 0, right: 0, top: 0, bottom: 0, 
+	skin: tierSkin,
+	contents: [],
+	behavior: Behavior({
+		onCreate(container){
+			if ($.content == "button"){
+				trace("content is a button\n");
+				container.add(new CircleButton({ skin: lampSkin }));
+			}
+			if ($.content == "string"){
+				container.skin = $.skin;
+				trace("content is a string\n");
+			}
+		}
+	})
 }))
 
 let mainScreen = new Column({
 	left: 0, right: 0, top: 0, bottom: 0,
 	contents: [
-		new Container({ left: 0, right: 0, top: 0, bottom: 0, skin: new Skin({ fill: "blue" }) }),
-		new Container({ left: 0, right: 0, top: 0, bottom: 0, skin: new Skin({ fill: "orange" }) }),
-		new Container({ left: 0, right: 0, top: 0, bottom: 0, skin: new Skin({ fill: "red" }) })
+		new NestedTier({ skin: new Skin({fill: "white"}), content: "button" }),
+		new NestedTier({ skin: new Skin({fill: "orange"}), content: "button" }),
+		new NestedTier({ skin: new Skin({fill: "red"}), content: "button" }),
+		
 	]
 })
 
