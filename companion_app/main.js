@@ -1,4 +1,63 @@
 import Pins from "pins";
+let remotePins;
+
+/*******************************/
+/*******    BEHAVIORS  *********/
+/*******************************/
+class AppBehavior extends Behavior {
+    onLaunch(application) {
+        let discoveryInstance = Pins.discover(
+            connectionDesc => {
+                if (connectionDesc.name == "pins-share") {
+                    trace("Connecting to remote pins\n");
+                    remotePins = Pins.connect(connectionDesc);
+                }
+            }, 
+            connectionDesc => {
+                if (connectionDesc.name == "pins-share") {
+                    trace("Disconnected from remote pins\n");
+                    remotePins = undefined;
+                }
+            }
+        );
+    }
+    onToggleLight(application, value) {
+    	trace("Toggling light\n");
+        if (remotePins) remotePins.invoke("/lamp_app/write", value);
+    }
+}
+
+var buttonBehavior = Behavior({
+	onTouchBegan: function(button){
+		if (button.variant !== 2) button.variant == 0? button.variant = 1 : button.variant = 0;
+	},
+	onTouchEnded: function(button){
+		button.state == 0? button.state = 1 : button.state = 0;
+		if (button.variant !== 2) button.variant == 0? button.variant = 1 : button.variant = 0;
+		if (button.name == "lamp"){
+			// Write HIGH to lamp if button state turned on
+			button.state == 0? application.distribute("onToggleLight", 0) : application.distribute("onToggleLight", 1);
+		}
+		else if (button.name == "weigh" && button.variant !== 2){
+			button.container.skin = new Skin({ fill: "#5DD454" });
+			button.variant = 2;
+			button.container.add(new BackArrow);
+			if (remotePins) {
+				remotePins.invoke("/scale/read", function(result){
+					if (result){
+						var displayString = result + " lbs";
+						button.container.add(new Label({ style: abzFont, string: displayString}))
+					}
+				})
+			}
+		}
+		else if (button.name == "feed" && button.variant !== 2){
+			button.container.skin = new Skin({ fill: "#20B46C" });
+			button.variant = 2;
+		}
+	}
+})
+
 
 /*******************************/
 /*******    TEXTURES  *********/
@@ -6,6 +65,7 @@ import Pins from "pins";
 let lampTexture = new Texture("assets/lamp_buttons.png");
 let weighTexture = new Texture("assets/weigh_buttons.png");
 let feedTexture = new Texture("assets/feed_buttons.png");
+let backTexture = new Texture("assets/back.png");
 
 var titleFont = new Style({ font: "36px ABeeZee", color: "white" })
 var abzFont = new Style({ font: "24px ABeeZee", color: "white" })
@@ -22,17 +82,38 @@ let lampSkin = new Skin({
 	states: 110, variants: 110 // state and variant offsets
 })
 let weighSkin = new Skin({
-	height: 110, width: 110, // dimensions of grid cell
+	height: 110, width: 110, 
 	texture: weighTexture,
 	variants: 110 			// weigh button has no on/off (state)
 })
 let feedSkin = new Skin({
-	height: 110, width: 110, // dimensions of grid cell
+	height: 110, width: 110, 
 	texture: feedTexture,
 	variants: 110 			// feed button has no on/off (state)
 })
+let backSkin = new Skin({
+	height: 31, width: 19,
+	texture: backTexture,
+	variants: 19
+})
 
 
+
+var BackArrow = Container.template( $ => ({
+	left: 20, height: 31, width: 19,
+	skin: backSkin, variant: 0,
+	active: true,
+	behavior: Behavior({
+		onTouchBegan: function(button){
+			button.variant = 1;
+		},
+		onTouchEnded: function(button){
+			button.variant = 0;
+			application.distribute("defaultView");
+		}
+	})
+
+}))
 
 let header = new Container({
 	left: 0, right: 0, top: 0, height: 60,
@@ -40,20 +121,12 @@ let header = new Container({
 	contents: [new Label({ style: titleFont, string: "koopa" })]
 })
 
-var buttonBehavior = Behavior({
-	onTouchBegan: function(button){
-		button.variant == 0? button.variant = 1 : button.variant = 0;
-	},
-	onTouchEnded: function(button){
-		button.state == 0? button.state = 1 : button.state = 0;
-		button.variant == 0? button.variant = 1 : button.variant = 0;
-	}
-})
+
 
 // CircleButton({ skin }) - skin should be a button skin with states/variants
 var CircleButton = Content.template ( $ => ({
 	height: 110, width: 110,
-	skin: $.skin, 
+	name: $.name, skin: $.skin, 
 	state: 0, variant: 0,
 	active: true,
 	behavior: buttonBehavior
@@ -62,13 +135,13 @@ var CircleButton = Content.template ( $ => ({
 // NestedTier({ skin, content })
 var NestedTier = Container.template( $ => ({
 	left: 0, right: 0, top: 0, height: 140, 
-	name: $.name, skin: $.boxSkin,
+	name: "tier", skin: $.boxSkin,
 	contents: [],
 	behavior: Behavior({
 		onCreate(container){
 			if ($.content == "button"){
 				trace("content is a button\n");
-				container.add(new CircleButton({ skin: $.buttonSkin }));
+				container.add(new CircleButton({ name: $.name, skin: $.buttonSkin }));
 			}
 			if ($.content == "string"){
 				container.skin = $.skin;
@@ -95,57 +168,10 @@ let appContainer = new Column({
 	contents: [header, mainScreen]
 })
 
-application.add(appContainer);
 
 
-
-/*
-
-let backgroundSkin = new Skin({ fill : ["#202020", "#7DBF2E"] });
-let textStyle = new Style({ font: "bold 50px", color: "white" });
-let MainContainer = Container.template($ => ({
-    top: 0, bottom: 0, left: 0, right: 0,
-    active: true, skin: backgroundSkin, state: 0,
-    contents: [
-        Label($, { name: "statusString", top: 0, bottom: 0, left: 0, right: 0, style: textStyle, string: "OFF" }),
-    ],
-    Behavior: class extends Behavior {
-        onTouchBegan(container) {
-            container.state = 1;
-            application.distribute("onToggleLight", 1);
-        }
-        onTouchEnded(container) {
-            container.state = 0;
-            application.distribute("onToggleLight", 0);
-        }
-        onToggleLight(container, value) {
-            container.statusString.string = (value) ? "ON" : "OFF";
-        }
-    }
-}));
-
-let remotePins;
-class AppBehavior extends Behavior {
-    onLaunch(application) {
-        application.add(new MainContainer());
-        let discoveryInstance = Pins.discover(
-            connectionDesc => {
-                if (connectionDesc.name == "pins-share-led") {
-                    trace("Connecting to remote pins\n");
-                    remotePins = Pins.connect(connectionDesc);
-                }
-            }, 
-            connectionDesc => {
-                if (connectionDesc.name == "pins-share-led") {
-                    trace("Disconnected from remote pins\n");
-                    remotePins = undefined;
-                }
-            }
-        );
-    }
-    onToggleLight(application, value) {
-        if (remotePins) remotePins.invoke("/led/write", value);
-    }
-}
+/*******************************/
+/*********    MAIN  ***********/
+/*******************************/
 application.behavior = new AppBehavior();
-*/
+application.add(appContainer);
