@@ -1,7 +1,6 @@
 import Pins from "pins";
 let remotePins;
 var TRANSITIONS = require("transitions");
-
 /*******************************/
 /*******    BEHAVIORS  *********/
 /*******************************/
@@ -26,19 +25,27 @@ class AppBehavior extends Behavior {
     	trace("Toggling light\n");
         if (remotePins) remotePins.invoke("/lamp_app/write", value);
     }
-    onWeigh(application, container){
+    onWeigh(application, button){
     	trace("Getting weight from scale\n");
     	if (remotePins) {
 			remotePins.invoke("/scale/read", function(result){
 				if (result){
 					var displayString = result + " lbs";
-					container.add(new Label({ style: abzFont, string: displayString}));
 				}
 			})
 		}
     }
-    onFeed(application, container){
+    onFeed(application, button){
    		trace("Rotating servo to dispense food\n");
+   		if (remotePins) {
+			remotePins.invoke("/scale/read", function(result){
+				if (result){
+					var displayString = "Your pet was fed.";
+				} else {
+					var displayString = "Your pet was not fed.";
+				}
+			})
+		}
     }
 }
 
@@ -54,27 +61,46 @@ let buttonBehavior = Behavior({
 			// Write HIGH to lamp if button state is turned on (new state)
 			button.state == 0? application.distribute("onToggleLight", 0) : application.distribute("onToggleLight", 1);
 		}
-		if (button.variant !== 2) {
+		else if (button.variant !== 2) {
 			button.visible = 0;  
 			let fillHex;
-			button.name == "weigh"? fillHex = "#5DD454" : fillHex = "#20B46C";
-			let toScreen = new NestedTier({ name: button.name, boxSkin: new Skin({ fill: fillHex }), content: "string"});
-	  			button.container.run( new TRANSITIONS.Push(), button.container.last, toScreen, 
-                     { direction: "left", duration: 200 } );
+			let buttonSkin;
+			if (button.name == "weigh"){
+				fillHex = "#5DD454"
+				buttonSkin = weighSkin;
+			} else if (button.name == "feed"){
+				fillHex = "#20B46C"
+				buttonSkin = feedSkin;
+			}
+                     				{ direction: "right", duration: 200 } );
 			if (button.name == "weigh"){
 				application.distribute("onWeigh", button);
-			
 			} else if (button.name == "feed"){
-			//	button.container.skin = new Skin({ fill: "#20B46C" });
-			//	button.variant = 2;
 				application.distribute("onFeed", button);
 			}
-		} else {}
+		}
 	}
 });
 
 
-let pushBackBehavior = Behavior({})
+let pushBackBehavior = Behavior({
+	onTouchBegan(button){
+		button.variant = 1;
+	},
+	onTouchEnded(button){
+		button.variant = 0;
+		let fillHex;
+		let buttonSkin;
+		if (button.name == "weigh"){
+			fillHex = "#CFF1BF"
+			buttonSkin = weighSkin;
+		} else if (button.name == "feed"){
+			fillHex = "#B8F99A"
+			buttonSkin = feedSkin;
+		}
+                     			{ direction: "left", duration: 200 } );
+	}			
+})
 
 /*******************************/
 /*******    TEXTURES  *********/
@@ -118,18 +144,9 @@ let backSkin = new Skin({
 
 var BackArrow = Container.template( $ => ({
 	left: 20, height: 31, width: 19,
-	skin: backSkin, variant: 0,
+	name: $.name, skin: backSkin, variant: 0,
 	active: true,
-	behavior: Behavior({
-		onTouchBegan: function(button){
-			button.variant = 1;
-		},
-		onTouchEnded: function(button){
-			button.variant = 0;
-			application.distribute("defaultView");
-		}
-	})
-
+	behavior: pushBackBehavior
 }))
 
 let header = new Container({
@@ -144,28 +161,22 @@ let header = new Container({
 var CircleButton = Content.template ( $ => ({
 	height: 110, width: 110,
 	name: $.name, skin: $.skin, 
-	state: 0, variant: 0,
+	state: 0, variant: $.variant,
 	active: true,
 	behavior: buttonBehavior
 }))
 
-// NestedTier({ skin, content })
+// NestedTier({ boxSkin, name, buttonSkin, variant })
 var NestedTier = Container.template( $ => ({
 	left: 0, right: 0, top: 0, height: 140, 
-	name: "tier", skin: $.boxSkin,
+ 	skin: $.boxSkin,
 	contents: [],
 	behavior: Behavior({
 		onCreate(container){
-			if ($.content == "button"){
-				trace("content is a button\n");
-				container.add(new CircleButton({ name: $.name, skin: $.buttonSkin }));
-			}
-			if ($.content == "string"){
-				container.add(new BackArrow);
-				//container.skin = $.skin;
-				trace("content is a string\n");
-				
-			//	container.add(new Label({style: abzFont, top: 0, left: 0, right: 0, bottom: 0, string: "Your pet was fed." }))
+			var button = new CircleButton({ name: $.name, skin: $.buttonSkin, variant: $.variant })
+			container.add(button);
+			if (button.variant == 2){
+				container.add(new BackArrow({ name: $.name }));
 			}
 		}
 	})
@@ -174,9 +185,9 @@ var NestedTier = Container.template( $ => ({
 let mainScreen = new Column({
 	left: 0, right: 0, top: 0, bottom: 0,
 	contents: [
-		new NestedTier({ name: "lamp", boxSkin: new Skin({ fill: "#E8F9E0" }), buttonSkin: lampSkin, content: "button" }),
-		new NestedTier({ name: "weigh", boxSkin: new Skin({ fill: "#CFF1BF" }), buttonSkin: weighSkin, content: "button" }),
-		new NestedTier({ name: "feed", boxSkin: new Skin({ fill: "#B8F99A" }), buttonSkin: feedSkin, content: "button" }),
+		new NestedTier({ name: "lamp", boxSkin: new Skin({ fill: "#E8F9E0" }), buttonSkin: lampSkin, variant: 0 }),
+		new NestedTier({ name: "weigh", boxSkin: new Skin({ fill: "#CFF1BF" }), buttonSkin: weighSkin, variant: 0 }),
+		new NestedTier({ name: "feed", boxSkin: new Skin({ fill: "#B8F99A" }), buttonSkin: feedSkin, variant: 0 }),
 		
 	]
 })
