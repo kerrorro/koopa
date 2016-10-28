@@ -1,6 +1,9 @@
 import Pins from "pins";
 let remotePins;
 var TRANSITIONS = require("transitions");
+var feedbackContainer;				// End point container for push transition
+var scaleState = false;			
+var servoPulseWidth = 0;
 /*******************************/
 /*******    BEHAVIORS  *********/
 /*******************************/
@@ -11,6 +14,7 @@ class AppBehavior extends Behavior {
                 if (connectionDesc.name == "pins-share") {
                     trace("Connecting to remote pins\n");
                     remotePins = Pins.connect(connectionDesc);
+                    application.distribute("onListening");
                 }
             }, 
             connectionDesc => {
@@ -22,39 +26,115 @@ class AppBehavior extends Behavior {
         );
     }
     onToggleLight(application, value) {
-    	trace("Toggling light\n");
-        if (remotePins) remotePins.invoke("/lamp_app/write", value);
+    	var statusStr;
+    	value == 1 ? statusStr = "on" : statusStr = "off";
+    	trace("Toggling light " + statusStr + "\n");
+        if (remotePins) {
+        	remotePins.invoke("/lamp_app/write", value);
+        }
     }
     onWeigh(application, button){
-    	trace("Getting weight from scale\n");
     	if (remotePins) {
+    		trace("Getting weight from scale\n");
 			remotePins.invoke("/scale/read", function(result){
 				if (result){
-					var displayString = result + " lbs";
+					var displayString = result.toFixed(2) + " lbs";
+				} else {
+					var displayString = "nothing on scale";
 				}
+				feedbackContainer.add(new Label({ style: abzFont, string: displayString}));
 			})
+		} else {
+			var displayString = "no scale connection";
+			feedbackContainer.add(new Label({ style: abzFont, string: displayString}));
 		}
+		
     }
     onFeed(application, button){
-   		trace("Rotating servo to dispense food\n");
    		if (remotePins) {
-			remotePins.invoke("/scale/read", function(result){
-				if (result){
-					var displayString = "Your pet was fed.";
-				} else {
-					var displayString = "Your pet was not fed.";
-				}
-			})
-		}
+   			var displayString = "your pet was fed";
+   			trace("Rotating servo to dispense food\n");
+   			servoPulseWidth == 0? servoPulseWidth = 10 : servoPulseWidth = 0;
+   			var period = 10; 
+   			remotePins.invoke("/feed_servo/writeDutyCyclePeriod", {dutyCycle: servoPulseWidth, period: period});
+   		} else {
+   			var displayString = "no motor connection";	
+   		}
+		feedbackContainer.add(new Label({ style: abzFont, string: displayString}));		
+    }
+    onListening(application){
+    	// Read lamp platform input every 200 ms and toggle light button on if turtle is on platform
+    	var previousSensorState = 0;
+    	var scaleStateChanged = false;
+    	remotePins.repeat("/lamp_platform/read", 1000, 
+							sensorState => { 
+    							var lampButtonState = mainScreen.first.first.state;
+    							if (sensorState != previousSensorState) {
+    								previousSensorState = sensorState;
+    								scaleStateChanged = true;
+    							}
+    							if (scaleStateChanged) {
+    								application.distribute("onToggleLight", sensorState);
+    								application.distribute("onPlatformPressed");
+    								sensorState == 1 ? scaleState = true : scaleState = false;
+    								scaleStateChanged = false;
+    							}
+    						});
     }
 }
 
 let buttonBehavior = Behavior({
+	onPlatformPressed: function(button){
+		trace("HELLOOOO\n");
+	},
 	onTouchBegan: function(button){
-		if (button.variant !== 2) button.variant == 0? button.variant = 1 : button.variant = 0;
+		if (button.name == "lamp"){		// If lamp button isn't already on, then allow user to hold turn lamp on temporarily
+			if (button.state == 0){
+				button.state = 1;
+				button.variant = 1;
+				application.distribute("onToggleLight", 1);
+			}
+		}
+		else {
+			if (button.variant !== 2) button.variant == 1;		// Turns scale and feed buttons to pressed variant onTouchBegan
+		}
 	},
 	onTouchEnded: function(button){
-		if (button.variant !== 2) button.variant == 0? button.variant = 1 : button.variant = 0;
+		if (button.name == "lamp") {
+			if (scaleState != 1) {
+				button.state = 0; 
+				button.variant = 0;
+				application.distribute("onToggleLight", 0);
+			}
+		} else {
+			var currentVariant = button.variant;
+			var toVariant;
+			if (currentVariant !== 2) {
+				currentVariant == 0? button.variant = 1 : button.variant = 0;
+				toVariant = button.variant;
+			}
+			if (toVariant) {
+				button.visible = 0;  
+				let fillHex;
+				let buttonSkin;
+				if (button.name == "weigh"){
+					fillHex = "#5DD454"
+					buttonSkin = weighSkin;
+				} else if (button.name == "feed"){
+					fillHex = "#20B46C"
+					buttonSkin = feedSkin;
+				}
+				feedbackContainer = new NestedTier({ name: button.name, boxSkin: new Skin({ fill: fillHex }), buttonSkin: buttonSkin, variant: 2});
+		  		button.container.run( new TRANSITIONS.Push(), button.container.last, feedbackContainer, 
+	                     				{ direction: "right", duration: 200 } );
+				if (button.name == "weigh"){
+					application.distribute("onWeigh", button);
+				} else if (button.name == "feed"){
+					application.distribute("onFeed", button);
+				}
+			}
+		}
+		/*
 		if (button.name == "lamp"){
 			// Toggle button state to new state
 			button.state == 0? button.state = 1 : button.state = 0;
@@ -72,14 +152,16 @@ let buttonBehavior = Behavior({
 				fillHex = "#20B46C"
 				buttonSkin = feedSkin;
 			}
+			feedbackContainer = new NestedTier({ name: button.name, boxSkin: new Skin({ fill: fillHex }), buttonSkin: buttonSkin, variant: 2});
+	  		button.container.run( new TRANSITIONS.Push(), button.container.last, feedbackContainer, 
                      				{ direction: "right", duration: 200 } );
 			if (button.name == "weigh"){
 				application.distribute("onWeigh", button);
 			} else if (button.name == "feed"){
 				application.distribute("onFeed", button);
 			}
-		}
-	}
+		}*/
+	},
 });
 
 
@@ -98,6 +180,8 @@ let pushBackBehavior = Behavior({
 			fillHex = "#B8F99A"
 			buttonSkin = feedSkin;
 		}
+		feedbackContainer = new NestedTier({ name: button.name, boxSkin: new Skin({ fill: fillHex }), buttonSkin: buttonSkin});
+	  	button.container.run( new TRANSITIONS.Push(), button.container.last, feedbackContainer, 
                      			{ direction: "left", duration: 200 } );
 	}			
 })
@@ -182,10 +266,11 @@ var NestedTier = Container.template( $ => ({
 	})
 }))
 
+var lampButton = new NestedTier({ name: "lamp", boxSkin: new Skin({ fill: "#E8F9E0" }), buttonSkin: lampSkin, variant: 0 });
 let mainScreen = new Column({
 	left: 0, right: 0, top: 0, bottom: 0,
 	contents: [
-		new NestedTier({ name: "lamp", boxSkin: new Skin({ fill: "#E8F9E0" }), buttonSkin: lampSkin, variant: 0 }),
+		lampButton,
 		new NestedTier({ name: "weigh", boxSkin: new Skin({ fill: "#CFF1BF" }), buttonSkin: weighSkin, variant: 0 }),
 		new NestedTier({ name: "feed", boxSkin: new Skin({ fill: "#B8F99A" }), buttonSkin: feedSkin, variant: 0 }),
 		
