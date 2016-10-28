@@ -2,7 +2,7 @@ import Pins from "pins";
 let remotePins;
 var TRANSITIONS = require("transitions");
 var feedbackContainer;				// End point container for push transition
-var scaleState = false;			
+var platformState = false;			
 var servoPulseWidth = 0;
 /*******************************/
 /*******    BEHAVIORS  *********/
@@ -65,27 +65,32 @@ class AppBehavior extends Behavior {
     onListening(application){
     	// Read lamp platform input every 200 ms and toggle light button on if turtle is on platform
     	var previousSensorState = 0;
-    	var scaleStateChanged = false;
+    	var platformStateChanged = false;
     	remotePins.repeat("/lamp_platform/read", 1000, 
 							sensorState => { 
     							var lampButtonState = mainScreen.first.first.state;
     							if (sensorState != previousSensorState) {
     								previousSensorState = sensorState;
-    								scaleStateChanged = true;
+    								platformStateChanged = true;
     							}
-    							if (scaleStateChanged) {
+    							if (platformStateChanged) {
+    								platformStateChanged = false;
+    								platformState = sensorState;
+    								if (sensorState == 1) application.distribute("onPlatformDown");
     								application.distribute("onToggleLight", sensorState);
-    								application.distribute("onPlatformPressed");
-    								sensorState == 1 ? scaleState = true : scaleState = false;
-    								scaleStateChanged = false;
+    								
     							}
     						});
     }
 }
 
 let buttonBehavior = Behavior({
-	onPlatformPressed: function(button){
-		trace("HELLOOOO\n");
+	onPlatformDown: function(button){
+		if (button.name == "lamp"){
+			trace(platformState + '\n');
+			button.state = 1;
+			button.variant = 1;
+		}
 	},
 	onTouchBegan: function(button){
 		if (button.name == "lamp"){		// If lamp button isn't already on, then allow user to hold turn lamp on temporarily
@@ -101,7 +106,7 @@ let buttonBehavior = Behavior({
 	},
 	onTouchEnded: function(button){
 		if (button.name == "lamp") {
-			if (scaleState != 1) {
+			if (button.state == 1 && platformState == 0) {
 				button.state = 0; 
 				button.variant = 0;
 				application.distribute("onToggleLight", 0);
