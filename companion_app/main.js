@@ -1,9 +1,14 @@
+import {
+	VerticalSlider, VerticalSliderBehavior,
+    HorizontalSlider, HorizontalSliderBehavior
+} from 'sliders';
 import Pins from "pins";
 let remotePins;
 var TRANSITIONS = require("transitions");
 var feedbackContainer;				// End point container for push transition
 var platformState = false;			
 var servoPulseWidth = 0;
+
 /*******************************/
 /*******    BEHAVIORS  *********/
 /*******************************/
@@ -66,9 +71,9 @@ class AppBehavior extends Behavior {
     	// Read lamp platform input every 200 ms and toggle light button on if turtle is on platform
     	var previousSensorState = 0;
     	var platformStateChanged = false;
-    	remotePins.repeat("/lamp_platform/read", 1000, 
+    	remotePins.repeat("/lamp_platform/read", 700, 
 							sensorState => { 
-    							var lampButtonState = mainScreen.first.first.state;
+    							//var lampButtonState = mainScreen.first.first.state;
     							if (sensorState != previousSensorState) {
     								previousSensorState = sensorState;
     								platformStateChanged = true;
@@ -76,20 +81,34 @@ class AppBehavior extends Behavior {
     							if (platformStateChanged) {
     								platformStateChanged = false;
     								platformState = sensorState;
-    								if (sensorState == 1) application.distribute("onPlatformDown");
+    								application.distribute("onPlatformChanged");
     								application.distribute("onToggleLight", sensorState);
-    								
+    								platformState == 1 ? application.distribute("generateSlider") : application.distribute("removeSlider");
     							}
     						});
+    }
+    generateSlider(application){
+    	var lampSlider = new Slider({ min: 0, max: 100, value: 100 });
+    	mainScreen.first.add(lampSlider);
+    	trace("Generating slider\n");
+    }
+    removeSlider(application){
+    	trace("Removing slider\n");
+    	mainScreen.first.remove(mainScreen.first.last);
     }
 }
 
 let buttonBehavior = Behavior({
-	onPlatformDown: function(button){
+	onPlatformChanged: function(button){
 		if (button.name == "lamp"){
-			trace(platformState + '\n');
-			button.state = 1;
-			button.variant = 1;
+		trace(platformState + '\n');
+			if (platformState == 1){
+				button.state = 1;
+				button.variant = 1;
+			} else {
+				button.state = 0;
+				button.variant = 0;
+			}
 		}
 	},
 	onTouchBegan: function(button){
@@ -139,36 +158,8 @@ let buttonBehavior = Behavior({
 				}
 			}
 		}
-		/*
-		if (button.name == "lamp"){
-			// Toggle button state to new state
-			button.state == 0? button.state = 1 : button.state = 0;
-			// Write HIGH to lamp if button state is turned on (new state)
-			button.state == 0? application.distribute("onToggleLight", 0) : application.distribute("onToggleLight", 1);
-		}
-		else if (button.variant !== 2) {
-			button.visible = 0;  
-			let fillHex;
-			let buttonSkin;
-			if (button.name == "weigh"){
-				fillHex = "#5DD454"
-				buttonSkin = weighSkin;
-			} else if (button.name == "feed"){
-				fillHex = "#20B46C"
-				buttonSkin = feedSkin;
-			}
-			feedbackContainer = new NestedTier({ name: button.name, boxSkin: new Skin({ fill: fillHex }), buttonSkin: buttonSkin, variant: 2});
-	  		button.container.run( new TRANSITIONS.Push(), button.container.last, feedbackContainer, 
-                     				{ direction: "right", duration: 200 } );
-			if (button.name == "weigh"){
-				application.distribute("onWeigh", button);
-			} else if (button.name == "feed"){
-				application.distribute("onFeed", button);
-			}
-		}*/
 	},
 });
-
 
 let pushBackBehavior = Behavior({
 	onTouchBegan(button){
@@ -191,6 +182,7 @@ let pushBackBehavior = Behavior({
 	}			
 })
 
+
 /*******************************/
 /*******    TEXTURES  *********/
 /*******************************/
@@ -201,6 +193,8 @@ let backTexture = new Texture("assets/back.png");
 
 var titleFont = new Style({ font: "36px ABeeZee", color: "white" })
 var abzFont = new Style({ font: "24px ABeeZee", color: "white" })
+
+
 /*******************************/
 /*********    SKINS  ***********/
 /*******************************/
@@ -230,7 +224,20 @@ let backSkin = new Skin({
 })
 
 
+/*******************************/
+/*******    TEMPLATES  *********/
+/*******************************/
+// Slider({ min, max, value })
+let Slider = VerticalSlider.template($ => ({
+    height: 100, right: 50,
+    Behavior: class extends VerticalSliderBehavior {
+        onValueChanged(container) {
+            trace("Value is: " + this.data.value + "\n");
+        }
+    }
+}));
 
+// BackArrow({ name })
 var BackArrow = Container.template( $ => ({
 	left: 20, height: 31, width: 19,
 	name: $.name, skin: backSkin, variant: 0,
@@ -238,15 +245,8 @@ var BackArrow = Container.template( $ => ({
 	behavior: pushBackBehavior
 }))
 
-let header = new Container({
-	left: 0, right: 0, top: 0, height: 60,
-	skin: headerSkin,
-	contents: [new Label({ style: titleFont, string: "koopa" })]
-})
 
-
-
-// CircleButton({ skin }) - skin should be a button skin with states/variants
+// CircleButton({ name, skin, variant }) - skin should be a button skin with states/variants
 var CircleButton = Content.template ( $ => ({
 	height: 110, width: 110,
 	name: $.name, skin: $.skin, 
@@ -271,11 +271,21 @@ var NestedTier = Container.template( $ => ({
 	})
 }))
 
-var lampButton = new NestedTier({ name: "lamp", boxSkin: new Skin({ fill: "#E8F9E0" }), buttonSkin: lampSkin, variant: 0 });
+
+/*******************************/
+/*****    APP COMPONENTS  ******/
+/*******************************/
+let header = new Container({
+	left: 0, right: 0, top: 0, height: 60,
+	skin: headerSkin,
+	contents: [new Label({ style: titleFont, string: "koopa" })]
+})
+
+//var lampTier = 
 let mainScreen = new Column({
 	left: 0, right: 0, top: 0, bottom: 0,
 	contents: [
-		lampButton,
+		new NestedTier({ name: "lamp", boxSkin: new Skin({ fill: "#E8F9E0" }), buttonSkin: lampSkin, variant: 0 }),
 		new NestedTier({ name: "weigh", boxSkin: new Skin({ fill: "#CFF1BF" }), buttonSkin: weighSkin, variant: 0 }),
 		new NestedTier({ name: "feed", boxSkin: new Skin({ fill: "#B8F99A" }), buttonSkin: feedSkin, variant: 0 }),
 		
