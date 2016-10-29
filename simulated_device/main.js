@@ -36,7 +36,11 @@ let MainContainer = Container.template($ => ({
 }));
 
 class AppBehavior extends Behavior {
+    onQuit(application) {
+        application.shared = false;
+    }
     onLaunch(application) {
+    	application.shared = true;
         Pins.configure({
             /*** lamp turns on when turtle is on the platform and off otherwise ***/            
             lamp_platform: {			// digital input to toggle lamp
@@ -74,10 +78,10 @@ class AppBehavior extends Behavior {
         },  success => {
             if (success) {
             	Pins.share("ws", {zeroconf: true, name: "pins-share"});
-            	Pins.repeat("/lamp/read", 700, 
-							lampState => { trace(Math.round(lampState * 10) * 10 + "\n") });
-     			           
-                /*application.add(new MainContainer({ 
+				application.add(new MainContainer({ content: [logo, pinsReady], backgroundColor: "#E8F9E0" }));
+     			/*Pins.repeat("/scale/read", 700, 
+							lampState => { trace(Math.round(lampState * 10) * 10 + "\n") });           
+                application.add(new MainContainer({ 
                 		content: [new IconContainer({ variant: 0 }),
                 				  new StringContainer({ string: "toasty" })], 
                 		backgroundColor: "black"  }));*/

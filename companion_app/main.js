@@ -1,18 +1,40 @@
 import {
 	VerticalSlider, VerticalSliderBehavior,
-    HorizontalSlider, HorizontalSliderBehavior
 } from 'sliders';
 import Pins from "pins";
 let remotePins;
 var TRANSITIONS = require("transitions");
+var deviceURL = "";
 var feedbackContainer;				// End point container for push transition
 var platformState = false;			
 var servoPulseWidth = 0;
+
+/************************************/
+/**** DEVICE DETECTION HANDLERS ****/
+/***********************************/
+Handler.bind("/discover", Behavior({
+    onInvoke: function(handler, message){
+    	trace("Device connected\n");
+        deviceURL = JSON.parse(message.requestText).url;
+    }
+}));
+
+Handler.bind("/forget", Behavior({
+    onInvoke: function(handler, message){
+        deviceURL = "";
+    }
+}));
 
 /*******************************/
 /*******    BEHAVIORS  *********/
 /*******************************/
 class AppBehavior extends Behavior {
+	onDisplayed(application) {
+        application.discover("p3-device");
+    }
+    onQuit(application) {
+        application.forget("p3-device");
+    }
     onLaunch(application) {
         let discoveryInstance = Pins.discover(
             connectionDesc => {

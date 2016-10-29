@@ -93,10 +93,6 @@ exports.writeDutyCyclePeriod = function(params) {
 	this.pinsSimulator.delegate("setValue", "period", params.period);
 }
 
-exports.read = function() {
-    return this.pinsSimulator.delegate("getValue");
-}
-
 exports.metadata = {
 	sinks: [
 		{
