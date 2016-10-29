@@ -35,7 +35,7 @@ class AppBehavior extends Behavior {
     	value == 1 ? statusStr = "on" : statusStr = "off";
     	trace("Toggling light " + statusStr + "\n");
         if (remotePins) {
-        	remotePins.invoke("/lamp_app/write", value);
+        	remotePins.invoke("/lamp/write", value);
         }
     }
     onWeigh(application, button){
@@ -112,8 +112,10 @@ let buttonBehavior = Behavior({
 		}
 	},
 	onTouchBegan: function(button){
+		trace("BUTTON CLICKED\n");
 		if (button.name == "lamp"){		// If lamp button isn't already on, then allow user to hold turn lamp on temporarily
 			if (button.state == 0){
+				trace("changing button state\n");
 				button.state = 1;
 				button.variant = 1;
 				application.distribute("onToggleLight", 1);
@@ -232,7 +234,12 @@ let Slider = VerticalSlider.template($ => ({
     height: 100, right: 50,
     Behavior: class extends VerticalSliderBehavior {
         onValueChanged(container) {
-            trace("Value is: " + this.data.value + "\n");
+            if(remotePins){
+            	var value = Math.round(this.data.value) / 100;
+            	trace("Written value: " + value + "\n");
+            	remotePins.invoke("/lamp/write", value);
+            }
+            //trace("Value is: " + this.data.value + "\n");
         }
     }
 }));
@@ -281,14 +288,12 @@ let header = new Container({
 	contents: [new Label({ style: titleFont, string: "koopa" })]
 })
 
-//var lampTier = 
 let mainScreen = new Column({
 	left: 0, right: 0, top: 0, bottom: 0,
 	contents: [
 		new NestedTier({ name: "lamp", boxSkin: new Skin({ fill: "#E8F9E0" }), buttonSkin: lampSkin, variant: 0 }),
 		new NestedTier({ name: "weigh", boxSkin: new Skin({ fill: "#CFF1BF" }), buttonSkin: weighSkin, variant: 0 }),
 		new NestedTier({ name: "feed", boxSkin: new Skin({ fill: "#B8F99A" }), buttonSkin: feedSkin, variant: 0 }),
-		
 	]
 })
 
