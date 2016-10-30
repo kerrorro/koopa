@@ -9,12 +9,13 @@ var feedbackContainer;				// End point container for push transition
 var platformState = false;			
 var servoPulseWidth = 0;
 
+
 /************************************/
 /**** DEVICE DETECTION HANDLERS ****/
 /***********************************/
 Handler.bind("/discover", Behavior({
     onInvoke: function(handler, message){
-    	trace("Device connected\n");
+    	//trace("Device connected\n");
         deviceURL = JSON.parse(message.requestText).url;
     }
 }));
@@ -70,6 +71,7 @@ class AppBehavior extends Behavior {
 					var displayString = "nothing on scale";
 				}
 				feedbackContainer.add(new Label({ style: abzFont, string: displayString}));
+				if (deviceURL != "") new Message(deviceURL + "onWeighed?" + serializeQuery({param: displayString})).invoke(Message.JSON);
 			})
 		} else {
 			var displayString = "no scale connection";
@@ -87,7 +89,8 @@ class AppBehavior extends Behavior {
    		} else {
    			var displayString = "no motor connection";	
    		}
-		feedbackContainer.add(new Label({ style: abzFont, string: displayString}));		
+		feedbackContainer.add(new Label({ style: abzFont, string: displayString}));
+		if (deviceURL != "") new Message(deviceURL + "onFed").invoke(Message.JSON);		
     }
     onListening(application){
     	// Read lamp platform input every 200 ms and toggle light button on if turtle is on platform
@@ -112,10 +115,8 @@ class AppBehavior extends Behavior {
     generateSlider(application){
     	var lampSlider = new Slider({ min: 0, max: 100, value: 100 });
     	mainScreen.first.add(lampSlider);
-    	trace("Generating slider\n");
     }
     removeSlider(application){
-    	trace("Removing slider\n");
     	mainScreen.first.remove(mainScreen.first.last);
     }
 }
@@ -134,7 +135,6 @@ let buttonBehavior = Behavior({
 		}
 	},
 	onTouchBegan: function(button){
-		trace("BUTTON CLICKED\n");
 		if (button.name == "lamp"){		// If lamp button isn't already on, then allow user to hold turn lamp on temporarily
 			if (button.state == 0){
 				trace("changing button state\n");
@@ -203,6 +203,7 @@ let pushBackBehavior = Behavior({
 		feedbackContainer = new NestedTier({ name: button.name, boxSkin: new Skin({ fill: fillHex }), buttonSkin: buttonSkin});
 	  	button.container.run( new TRANSITIONS.Push(), button.container.last, feedbackContainer, 
                      			{ direction: "left", duration: 200 } );
+        if (deviceURL != "") new Message(deviceURL + "onBack").invoke(Message.JSON);	
 	}			
 })
 
@@ -252,16 +253,21 @@ let backSkin = new Skin({
 /*******    TEMPLATES  *********/
 /*******************************/
 // Slider({ min, max, value })
+var lastOpacity;
 let Slider = VerticalSlider.template($ => ({
     height: 100, right: 50,
     Behavior: class extends VerticalSliderBehavior {
         onValueChanged(container) {
             if(remotePins){
-            	var value = Math.round(this.data.value) / 100;
-            	trace("Written value: " + value + "\n");
+            	var value = Math.round(this.data.value) / 100;		// Convert values 0-100 to 0-1 decimals for analog output
             	remotePins.invoke("/lamp/write", value);
+            	value = Math.round(value * 10) * 10;				// Round original value to nearest 10 for opacity thresholds
+            	if (value != lastOpacity){							// Only change opacity if it's different than current screen
+            		trace("invoking changeopacity handler\n");
+            		lastOpacity = value;
+            		if (deviceURL != "") new Message(deviceURL + "changeOpacity?" + serializeQuery({param: value})).invoke(Message.JSON);
+            	}
             }
-            //trace("Value is: " + this.data.value + "\n");
         }
     }
 }));
