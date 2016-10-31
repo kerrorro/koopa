@@ -141,7 +141,7 @@ class AppBehavior extends Behavior {
                         
             /*** reading in weight when turtle is on scale ***/
             scale: {				// analog input to display weight from scale
-            	require: "Analog",
+            	require: "analog",
             	pins: {
             		ground: { pin: 53, type: "Ground" },
             		analog: { pin: 54 }

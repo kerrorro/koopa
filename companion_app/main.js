@@ -139,6 +139,12 @@ let buttonBehavior = Behavior({
 			}
 		}
 	},
+	onOpacityChanged: function(button, value){
+		if (button.name == "lamp"){
+			var variant = 11 - value / 10;
+			button.variant = variant;
+		}
+	},
 	onTouchBegan: function(button){
 		if (button.name == "lamp"){		// If lamp button isn't already on, then allow user to hold turn lamp on temporarily
 			if (button.state == 0){
@@ -270,6 +276,7 @@ let Slider = VerticalSlider.template($ => ({
             	if (value != lastOpacity){							// Only change opacity if it's different than current screen
             		trace("invoking changeopacity handler\n");
             		lastOpacity = value;
+            		application.distribute("onOpacityChanged", value);
             		if (deviceURL != "") new Message(deviceURL + "changeOpacity?" + serializeQuery({param: value})).invoke(Message.JSON);
             	}
             }
